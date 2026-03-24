@@ -5,12 +5,12 @@ Created on Tue Mar 24 13:07:51 2026
 @author: pablo
 """
 import streamlit as st
-import yfinance as yf # <-- NUESTRO NUEVO MOTOR SIN LÍMITES
+import yfinance as yf
 import pandas as pd
 from io import BytesIO
 import datetime
 import plotly.graph_objects as go
-import urllib.request
+import requests
 import xml.etree.ElementTree as ET
 
 # ==========================================
@@ -21,7 +21,7 @@ st.title("📈 Terminal de Análisis Algorítmico")
 st.markdown("Plataforma interactiva impulsada por **Yahoo Finance** (Sin límites de API ni bloqueos).")
 
 # ==========================================
-# 2. MENÚ LATERAL (Sin API Keys)
+# 2. MENÚ LATERAL
 # ==========================================
 st.sidebar.header("⚙️ Configuración del Motor")
 simbolo = st.sidebar.selectbox("Selecciona la Empresa:", ["AAPL", "MSFT", "TSLA", "AMZN", "GOOG"])
@@ -34,17 +34,15 @@ fecha_fin = st.sidebar.date_input("Fecha de fin", datetime.date.today())
 # ==========================================
 # 3. EJECUCIÓN DEL MOTOR (YFINANCE)
 # ==========================================
-# Agregamos un botón para que no se recargue solo a cada rato
 if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
     with st.spinner(f"Conectando con Yahoo Finance para extraer {simbolo}..."):
         try:
-            # Magia pura: yfinance descarga todo en una sola línea de código
+            # Extracción de precios sin límites
             ticker = yf.Ticker(simbolo)
-            # Le sumamos 1 día a la fecha final para asegurar que incluya el día de hoy
             df = ticker.history(start=fecha_inicio, end=fecha_fin + datetime.timedelta(days=1))
 
             if not df.empty:
-                # Limpiamos la zona horaria para evitar problemas con las gráficas
+                # Limpiamos la zona horaria
                 df.index = df.index.tz_localize(None)
                 
                 # ==========================================
@@ -75,7 +73,7 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                 fig.update_layout(xaxis_title="Fecha", yaxis_title="Precio (USD)", template="plotly_dark", height=500)
                 st.plotly_chart(fig, use_container_width=True)
 
-               # ==========================================
+                # ==========================================
                 # 5. NOTICIAS EN TIEMPO REAL (Vía RSS Oficial)
                 # ==========================================
                 st.divider()
@@ -83,14 +81,14 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                 
                 try:
                     url_rss = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={simbolo}&region=US&lang=en-US"
-                    respuesta_rss = urllib.request.urlopen(url_rss)
-                    xml_data = respuesta_rss.read()
-                    raiz = ET.fromstring(xml_data)
+                    cabeceras = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                    respuesta_rss = requests.get(url_rss, headers=cabeceras)
                     
+                    raiz = ET.fromstring(respuesta_rss.text)
                     noticias_encontradas = raiz.findall('./channel/item')
                     
                     if noticias_encontradas:
-                        for noticia in noticias_encontradas[:3]: # Mostramos las últimas 3
+                        for noticia in noticias_encontradas[:3]:
                             titulo = noticia.find('title').text
                             enlace = noticia.find('link').text
                             fecha_pub = noticia.find('pubDate').text
@@ -101,7 +99,7 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                     else:
                         st.info("ℹ️ No hay noticias recientes para esta empresa.")
                 except Exception as e:
-                    st.warning("No se pudieron cargar las noticias en este momento.")
+                    st.warning("El muro de noticias está temporalmente en mantenimiento.")
 
                 # ==========================================
                 # 6. EXPORTACIÓN A EXCEL
