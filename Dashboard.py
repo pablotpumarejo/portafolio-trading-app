@@ -10,6 +10,8 @@ import pandas as pd
 from io import BytesIO
 import datetime
 import plotly.graph_objects as go
+import urllib.request
+import xml.etree.ElementTree as ET
 
 # ==========================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
@@ -73,23 +75,33 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                 fig.update_layout(xaxis_title="Fecha", yaxis_title="Precio (USD)", template="plotly_dark", height=500)
                 st.plotly_chart(fig, use_container_width=True)
 
-                # ==========================================
-                # 5. NOTICIAS EN TIEMPO REAL (De Yahoo Finance)
+               # ==========================================
+                # 5. NOTICIAS EN TIEMPO REAL (Vía RSS Oficial)
                 # ==========================================
                 st.divider()
                 st.subheader("📰 Noticias Recientes")
-                noticias = ticker.news
-                if noticias:
-                    for noticia in noticias[:3]:
-                        titulo = noticia.get('title', 'Sin título')
-                        enlace = noticia.get('link', '#')
-                        editor = noticia.get('publisher', 'Desconocido')
-                        
-                        st.markdown(f"**[{titulo}]({enlace})**")
-                        st.caption(f"Fuente: {editor}")
-                        st.write("---")
-                else:
-                    st.info("ℹ️ No hay noticias recientes para mostrar.")
+                
+                try:
+                    url_rss = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={simbolo}&region=US&lang=en-US"
+                    respuesta_rss = urllib.request.urlopen(url_rss)
+                    xml_data = respuesta_rss.read()
+                    raiz = ET.fromstring(xml_data)
+                    
+                    noticias_encontradas = raiz.findall('./channel/item')
+                    
+                    if noticias_encontradas:
+                        for noticia in noticias_encontradas[:3]: # Mostramos las últimas 3
+                            titulo = noticia.find('title').text
+                            enlace = noticia.find('link').text
+                            fecha_pub = noticia.find('pubDate').text
+                            
+                            st.markdown(f"**[{titulo}]({enlace})**")
+                            st.caption(f"📅 Publicado: {fecha_pub}")
+                            st.write("---")
+                    else:
+                        st.info("ℹ️ No hay noticias recientes para esta empresa.")
+                except Exception as e:
+                    st.warning("No se pudieron cargar las noticias en este momento.")
 
                 # ==========================================
                 # 6. EXPORTACIÓN A EXCEL
