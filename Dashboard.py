@@ -5,84 +5,68 @@ Created on Tue Mar 24 13:07:51 2026
 @author: pablo
 """
 import streamlit as st
-import requests
+import yfinance as yf # <-- NUESTRO NUEVO MOTOR SIN LÍMITES
 import pandas as pd
-import numpy as np
 from io import BytesIO
 import datetime
-import plotly.graph_objects as go # Librería para las velas interactivas
+import plotly.graph_objects as go
 
 # ==========================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
 # ==========================================
 st.set_page_config(page_title="Terminal Cuantitativa Pro", layout="wide")
-st.title("📈 Terminal de Análisis Algorítmico y Sentimiento")
-st.markdown("Plataforma interactiva con Velas Japonesas y Análisis de Noticias.")
+st.title("📈 Terminal de Análisis Algorítmico")
+st.markdown("Plataforma interactiva impulsada por **Yahoo Finance** (Sin límites de API ni bloqueos).")
 
 # ==========================================
-# 2. MENÚ LATERAL INTERACTIVO
+# 2. MENÚ LATERAL (Sin API Keys)
 # ==========================================
 st.sidebar.header("⚙️ Configuración del Motor")
-API_KEY = st.sidebar.text_input("Ingresa tu API Key de Alpha Vantage:", type="password")
-simbolo = st.sidebar.selectbox("Selecciona la Empresa:", ["AAPL", "MSFT", "TSLA", "AMZN", "GOOGL"])
+simbolo = st.sidebar.selectbox("Selecciona la Empresa:", ["AAPL", "MSFT", "TSLA", "AMZN", "GOOG"])
 
 st.sidebar.divider()
 st.sidebar.subheader("📅 Rango de Análisis")
-# Definimos el rango de fechas (por defecto los últimos 3 meses)
 fecha_inicio = st.sidebar.date_input("Fecha de inicio", datetime.date(2025, 1, 1))
 fecha_fin = st.sidebar.date_input("Fecha de fin", datetime.date.today())
 
 # ==========================================
-# 3. EJECUCIÓN DEL MOTOR PRINCIPAL
+# 3. EJECUCIÓN DEL MOTOR (YFINANCE)
 # ==========================================
-if API_KEY:
-    with st.spinner(f"Conectando con Wall Street para extraer {simbolo}..."):
-        # LLAMADA 1: Datos de Precios
-        url_precios = f'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={simbolo}&apikey={API_KEY}&outputsize=full'
-        res_precios = requests.get(url_precios)
-        datos_crudos = res_precios.json()
-
-        if 'Time Series (Daily)' in datos_crudos:
-            # --- TRANSFORMACIÓN DE DATOS ---
-            series_diarias = datos_crudos['Time Series (Daily)']
-            df = pd.DataFrame.from_dict(series_diarias, orient='index')
-            df.columns = ['Apertura', 'Maximo', 'Minimo', 'Cierre', 'Volumen']
-            df.index = pd.to_datetime(df.index)
-            
-            # Convertir a números reales
-            for col in df.columns:
-                df[col] = df[col].astype(float)
-            
-            # Ordenar por fecha (antiguo a reciente)
-            df = df.sort_index()
-
-            # --- FILTRO DE FECHAS ---
-            mascara = (df.index.date >= fecha_inicio) & (df.index.date <= fecha_fin)
-            df = df.loc[mascara]
+# Agregamos un botón para que no se recargue solo a cada rato
+if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
+    with st.spinner(f"Conectando con Yahoo Finance para extraer {simbolo}..."):
+        try:
+            # Magia pura: yfinance descarga todo en una sola línea de código
+            ticker = yf.Ticker(simbolo)
+            # Le sumamos 1 día a la fecha final para asegurar que incluya el día de hoy
+            df = ticker.history(start=fecha_inicio, end=fecha_fin + datetime.timedelta(days=1))
 
             if not df.empty:
+                # Limpiamos la zona horaria para evitar problemas con las gráficas
+                df.index = df.index.tz_localize(None)
+                
                 # ==========================================
                 # 4. VISUALIZACIÓN: MÉTRICAS Y VELAS
                 # ==========================================
                 st.divider()
                 col1, col2, col3 = st.columns(3)
                 
-                precio_actual = df['Cierre'].iloc[-1]
-                precio_ayer = df['Cierre'].iloc[-2] if len(df) > 1 else precio_actual
+                precio_actual = df['Close'].iloc[-1]
+                precio_ayer = df['Close'].iloc[-2] if len(df) > 1 else precio_actual
                 variacion = precio_actual - precio_ayer
                 
                 col1.metric("Precio de Cierre", f"${precio_actual:.2f}", f"{variacion:.2f} USD")
-                col2.metric("Volumen Diario", f"{df['Volumen'].iloc[-1]:,.0f}")
-                col3.write("💡 *Usa el mouse para hacer zoom en la gráfica*")
+                col2.metric("Volumen Diario", f"{df['Volume'].iloc[-1]:,.0f}")
+                col3.write("💡 *Conexión directa: Sin límites de peticiones.*")
 
                 # GRÁFICO INTERACTIVO (PLOTLY)
                 st.subheader(f"🕯️ Gráfico de Velas Japonesas - {simbolo}")
                 fig = go.Figure(data=[go.Candlestick(
                     x=df.index,
-                    open=df['Apertura'],
-                    high=df['Maximo'],
-                    low=df['Minimo'],
-                    close=df['Cierre'],
+                    open=df['Open'],
+                    high=df['High'],
+                    low=df['Low'],
+                    close=df['Close'],
                     name="Precio"
                 )])
                 
@@ -90,30 +74,22 @@ if API_KEY:
                 st.plotly_chart(fig, use_container_width=True)
 
                 # ==========================================
-                # 5. MOTOR DE NOTICIAS CON ESCUDO PROTECTOR
+                # 5. NOTICIAS EN TIEMPO REAL (De Yahoo Finance)
                 # ==========================================
                 st.divider()
-                st.subheader("📰 Noticias Recientes y Sentimiento")
-                
-                try:
-                    # Hacemos la petición de noticias
-                    url_noticias = f'https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={simbolo}&apikey={API_KEY}&limit=3'
-                    res_noticias = requests.get(url_noticias)
-                    datos_noticias = res_noticias.json()
-                    
-                    if 'feed' in datos_noticias and datos_noticias['feed']:
-                        for noticia in datos_noticias['feed'][:3]:
-                            sentimiento = noticia['overall_sentiment_label']
-                            # Emoji dinámico
-                            emoji = "🟢" if "Bullish" in sentimiento else "🔴" if "Bearish" in sentimiento else "⚪"
-                            
-                            st.markdown(f"**[{noticia['title']}]({noticia['url']})**")
-                            st.caption(f"Sentimiento IA: {emoji} {sentimiento}")
-                            st.write("---")
-                    else:
-                        st.info("ℹ️ No hay noticias disponibles en este momento (Límite de API alcanzado).")
-                except:
-                    st.info("ℹ️ El motor de noticias está descansando para no saturar la API. Las gráficas siguen activas.")
+                st.subheader("📰 Noticias Recientes")
+                noticias = ticker.news
+                if noticias:
+                    for noticia in noticias[:3]:
+                        titulo = noticia.get('title', 'Sin título')
+                        enlace = noticia.get('link', '#')
+                        editor = noticia.get('publisher', 'Desconocido')
+                        
+                        st.markdown(f"**[{titulo}]({enlace})**")
+                        st.caption(f"Fuente: {editor}")
+                        st.write("---")
+                else:
+                    st.info("ℹ️ No hay noticias recientes para mostrar.")
 
                 # ==========================================
                 # 6. EXPORTACIÓN A EXCEL
@@ -123,14 +99,14 @@ if API_KEY:
                     df.to_excel(writer, sheet_name=f'Reporte_{simbolo}')
                 
                 st.download_button(
-                    label=f"📥 Descargar Datos de {simbolo} en Excel",
+                    label=f"📥 Descargar Datos en Excel",
                     data=buffer.getvalue(),
-                    file_name=f"Reporte_{simbolo}.xlsx",
+                    file_name=f"Reporte_{simbolo}_YF.xlsx",
                     mime="application/vnd.ms-excel"
                 )
             else:
-                st.warning("No hay datos para las fechas seleccionadas. Ajusta el calendario en el menú lateral.")
-        else:
-            st.error("❌ Error: No se pudieron obtener los datos. Verifica tu API Key o espera 1 minuto.")
+                st.warning("No hay datos para las fechas seleccionadas. Ajusta el calendario.")
+        except Exception as e:
+            st.error(f"❌ Error al conectar con Yahoo Finance: {e}")
 else:
-    st.warning("👈 Por favor, ingresa tu API Key en el menú de la izquierda para arrancar.")
+    st.info("👈 Selecciona la empresa, ajusta las fechas y presiona 'Extraer Datos' en el menú lateral.")
