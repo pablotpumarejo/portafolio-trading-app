@@ -12,13 +12,14 @@ import datetime
 import plotly.graph_objects as go
 import requests
 import xml.etree.ElementTree as ET
+from sklearn.ensemble import RandomForestClassifier
 
 # ==========================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
 # ==========================================
 st.set_page_config(page_title="Terminal Cuantitativa Pro", layout="wide")
 st.title("📈 Terminal de Análisis Algorítmico")
-st.markdown("Plataforma interactiva impulsada por **Yahoo Finance** (Sin límites de API ni bloqueos).")
+st.markdown("Plataforma interactiva impulsada por **Yahoo Finance** y **Machine Learning**.")
 
 # ==========================================
 # 2. MENÚ LATERAL
@@ -37,12 +38,10 @@ fecha_fin = st.sidebar.date_input("Fecha de fin", datetime.date.today())
 if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
     with st.spinner(f"Conectando con Yahoo Finance para extraer {simbolo}..."):
         try:
-            # Extracción de precios sin límites
             ticker = yf.Ticker(simbolo)
             df = ticker.history(start=fecha_inicio, end=fecha_fin + datetime.timedelta(days=1))
 
             if not df.empty:
-                # Limpiamos la zona horaria
                 df.index = df.index.tz_localize(None)
                 
                 # ==========================================
@@ -59,7 +58,6 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                 col2.metric("Volumen Diario", f"{df['Volume'].iloc[-1]:,.0f}")
                 col3.write("💡 *Conexión directa: Sin límites de peticiones.*")
 
-                # GRÁFICO INTERACTIVO (PLOTLY)
                 st.subheader(f"🕯️ Gráfico de Velas Japonesas - {simbolo}")
                 fig = go.Figure(data=[go.Candlestick(
                     x=df.index,
@@ -74,11 +72,10 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                 st.plotly_chart(fig, use_container_width=True)
 
                 # ==========================================
-                # 5. NOTICIAS EN TIEMPO REAL (Vía RSS Oficial)
+                # 5. NOTICIAS EN TIEMPO REAL (Vía RSS)
                 # ==========================================
                 st.divider()
                 st.subheader("📰 Noticias Recientes")
-                
                 try:
                     url_rss = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={simbolo}&region=US&lang=en-US"
                     cabeceras = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -92,7 +89,6 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                             titulo = noticia.find('title').text
                             enlace = noticia.find('link').text
                             fecha_pub = noticia.find('pubDate').text
-                            
                             st.markdown(f"**[{titulo}]({enlace})**")
                             st.caption(f"📅 Publicado: {fecha_pub}")
                             st.write("---")
@@ -114,49 +110,47 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                     file_name=f"Reporte_{simbolo}_YF.xlsx",
                     mime="application/vnd.ms-excel"
                 )
-            else:
-                st.warning("No hay datos para las fechas seleccionadas. Ajusta el calendario.")
-        except Exception as e:
-            st.error(f"❌ Error al conectar con Yahoo Finance: {e}")
-else:
-    st.info("👈 Selecciona la empresa, ajusta las fechas y presiona 'Extraer Datos' en el menú lateral.")
-    
 
-# ==========================================
+                # ==========================================
                 # 7. CEREBRO PREDICTIVO (MACHINE LEARNING)
                 # ==========================================
                 st.divider()
                 st.subheader("🤖 Oráculo de Inteligencia Artificial")
                 st.write("Entrena un modelo de Random Forest en tiempo real para proyectar la tendencia de mañana.")
                 
+                # Botón independiente para la IA
                 if st.button("🔮 Generar Predicción para Mañana"):
                     with st.spinner("Entrenando Árboles de Decisión con datos históricos..."):
-                        from sklearn.ensemble import RandomForestClassifier
-                        
-                        # 1. Preparamos los datos rápidamente
+                        # Preparar datos
                         df_ml = df.copy()
                         df_ml["Tomorrow"] = df_ml["Close"].shift(-1)
                         df_ml["Target"] = (df_ml["Tomorrow"] > df_ml["Close"]).astype(int)
                         
-                        # 2. Ingeniería de Características Express (Las pistas que descubriste)
+                        # Ingeniería de características
                         df_ml["Ratio_Cierre_2"] = df_ml["Close"] / df_ml["Close"].rolling(2).mean()
                         df_ml["Ratio_Cierre_5"] = df_ml["Close"] / df_ml["Close"].rolling(5).mean()
                         df_ml = df_ml.dropna()
                         
                         predictores_ml = ["Close", "Volume", "Ratio_Cierre_2", "Ratio_Cierre_5"]
                         
-                        # 3. Entrenamos el modelo
+                        # Entrenar modelo
                         modelo_web = RandomForestClassifier(n_estimators=100, min_samples_split=50, random_state=1)
                         modelo_web.fit(df_ml[predictores_ml], df_ml["Target"])
                         
-                        # 4. Predecimos mañana
+                        # Predecir
                         datos_hoy_web = df_ml.iloc[[-1]][predictores_ml]
                         prediccion_web = modelo_web.predict(datos_hoy_web)
                         
-                        # 5. Mostramos el resultado con estilo
+                        # Resultado
                         if prediccion_web[0] == 1:
                             st.success("📈 **VEREDICTO DE LA IA:** La tendencia proyectada para mañana es **ALCISTA** (El precio podría subir).")
                         else:
                             st.error("📉 **VEREDICTO DE LA IA:** La tendencia proyectada para mañana es **BAJISTA** (El precio podría bajar).")
-                        
                         st.caption("Nota: Modelo matemático basado en Random Forest. No constituye asesoría financiera real.")
+
+            else:
+                st.warning("No hay datos para las fechas seleccionadas. Ajusta el calendario.")
+        except Exception as e:
+            st.error(f"❌ Error al conectar con Yahoo Finance: {e}")
+else:
+    st.info("👈 Selecciona la empresa, ajusta las fechas y presiona 'Extraer Datos' en el menú lateral.")
