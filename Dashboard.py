@@ -120,3 +120,43 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
             st.error(f"❌ Error al conectar con Yahoo Finance: {e}")
 else:
     st.info("👈 Selecciona la empresa, ajusta las fechas y presiona 'Extraer Datos' en el menú lateral.")
+    
+
+# ==========================================
+                # 7. CEREBRO PREDICTIVO (MACHINE LEARNING)
+                # ==========================================
+                st.divider()
+                st.subheader("🤖 Oráculo de Inteligencia Artificial")
+                st.write("Entrena un modelo de Random Forest en tiempo real para proyectar la tendencia de mañana.")
+                
+                if st.button("🔮 Generar Predicción para Mañana"):
+                    with st.spinner("Entrenando Árboles de Decisión con datos históricos..."):
+                        from sklearn.ensemble import RandomForestClassifier
+                        
+                        # 1. Preparamos los datos rápidamente
+                        df_ml = df.copy()
+                        df_ml["Tomorrow"] = df_ml["Close"].shift(-1)
+                        df_ml["Target"] = (df_ml["Tomorrow"] > df_ml["Close"]).astype(int)
+                        
+                        # 2. Ingeniería de Características Express (Las pistas que descubriste)
+                        df_ml["Ratio_Cierre_2"] = df_ml["Close"] / df_ml["Close"].rolling(2).mean()
+                        df_ml["Ratio_Cierre_5"] = df_ml["Close"] / df_ml["Close"].rolling(5).mean()
+                        df_ml = df_ml.dropna()
+                        
+                        predictores_ml = ["Close", "Volume", "Ratio_Cierre_2", "Ratio_Cierre_5"]
+                        
+                        # 3. Entrenamos el modelo
+                        modelo_web = RandomForestClassifier(n_estimators=100, min_samples_split=50, random_state=1)
+                        modelo_web.fit(df_ml[predictores_ml], df_ml["Target"])
+                        
+                        # 4. Predecimos mañana
+                        datos_hoy_web = df_ml.iloc[[-1]][predictores_ml]
+                        prediccion_web = modelo_web.predict(datos_hoy_web)
+                        
+                        # 5. Mostramos el resultado con estilo
+                        if prediccion_web[0] == 1:
+                            st.success("📈 **VEREDICTO DE LA IA:** La tendencia proyectada para mañana es **ALCISTA** (El precio podría subir).")
+                        else:
+                            st.error("📉 **VEREDICTO DE LA IA:** La tendencia proyectada para mañana es **BAJISTA** (El precio podría bajar).")
+                        
+                        st.caption("Nota: Modelo matemático basado en Random Forest. No constituye asesoría financiera real.")
