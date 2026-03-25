@@ -124,7 +124,7 @@ if st.session_state.datos_extraidos:
                 # 7. CEREBRO PREDICTIVO (MACHINE LEARNING)
                 # ==========================================
                 st.divider()
-                st.subheader("🤖 Oráculo de Inteligencia Artificial")
+                st.subheader("🤖Inteligencia Artificial (Corto Plazo)")
                 st.write("Entrena un modelo de Random Forest en tiempo real para proyectar la tendencia de mañana.")
                 
                 if st.button("🔮 Generar Predicción para Mañana"):
