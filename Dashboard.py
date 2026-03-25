@@ -15,11 +15,15 @@ import xml.etree.ElementTree as ET
 from sklearn.ensemble import RandomForestClassifier
 
 # ==========================================
-# 1. CONFIGURACIÓN DE LA PÁGINA
+# 1. CONFIGURACIÓN DE LA PÁGINA Y MEMORIA
 # ==========================================
 st.set_page_config(page_title="Terminal Cuantitativa Pro", layout="wide")
 st.title("📈 Terminal de Análisis Algorítmico")
 st.markdown("Plataforma interactiva impulsada por **Yahoo Finance** y **Machine Learning**.")
+
+# 🧠 EL TRUCO SENIOR: Darle "memoria" a la aplicación
+if "datos_extraidos" not in st.session_state:
+    st.session_state.datos_extraidos = False
 
 # ==========================================
 # 2. MENÚ LATERAL
@@ -32,10 +36,15 @@ st.sidebar.subheader("📅 Rango de Análisis")
 fecha_inicio = st.sidebar.date_input("Fecha de inicio", datetime.date(2025, 1, 1))
 fecha_fin = st.sidebar.date_input("Fecha de fin", datetime.date.today())
 
+# Si presionan el botón lateral, guardamos en la memoria que ya se extrajeron los datos
+if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
+    st.session_state.datos_extraidos = True
+
 # ==========================================
 # 3. EJECUCIÓN DEL MOTOR (YFINANCE)
 # ==========================================
-if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
+# Ahora evaluamos la memoria, no solo el botón
+if st.session_state.datos_extraidos:
     with st.spinner(f"Conectando con Yahoo Finance para extraer {simbolo}..."):
         try:
             ticker = yf.Ticker(simbolo)
@@ -118,30 +127,24 @@ if st.sidebar.button("🚀 Extraer Datos de Wall Street"):
                 st.subheader("🤖 Oráculo de Inteligencia Artificial")
                 st.write("Entrena un modelo de Random Forest en tiempo real para proyectar la tendencia de mañana.")
                 
-                # Botón independiente para la IA
                 if st.button("🔮 Generar Predicción para Mañana"):
                     with st.spinner("Entrenando Árboles de Decisión con datos históricos..."):
-                        # Preparar datos
                         df_ml = df.copy()
                         df_ml["Tomorrow"] = df_ml["Close"].shift(-1)
                         df_ml["Target"] = (df_ml["Tomorrow"] > df_ml["Close"]).astype(int)
                         
-                        # Ingeniería de características
                         df_ml["Ratio_Cierre_2"] = df_ml["Close"] / df_ml["Close"].rolling(2).mean()
                         df_ml["Ratio_Cierre_5"] = df_ml["Close"] / df_ml["Close"].rolling(5).mean()
                         df_ml = df_ml.dropna()
                         
                         predictores_ml = ["Close", "Volume", "Ratio_Cierre_2", "Ratio_Cierre_5"]
                         
-                        # Entrenar modelo
                         modelo_web = RandomForestClassifier(n_estimators=100, min_samples_split=50, random_state=1)
                         modelo_web.fit(df_ml[predictores_ml], df_ml["Target"])
                         
-                        # Predecir
                         datos_hoy_web = df_ml.iloc[[-1]][predictores_ml]
                         prediccion_web = modelo_web.predict(datos_hoy_web)
                         
-                        # Resultado
                         if prediccion_web[0] == 1:
                             st.success("📈 **VEREDICTO DE LA IA:** La tendencia proyectada para mañana es **ALCISTA** (El precio podría subir).")
                         else:
